@@ -61,3 +61,8 @@ crowdin.properties
 /monocleschatFree/release/baselineProfiles/0/Conversations-monocleschat-free-x86_64-release.dm
 /monocleschatFree/release/baselineProfiles/1/Conversations-monocleschat-free-x86_64-release.dm
 /monocleschatFree/release/output-metadata.json
+
+# Tools - credentials and binaries
+tools/config.bat
+tools/rclone.exe
+tools/notification.mp3
