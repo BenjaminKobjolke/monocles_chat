@@ -1994,7 +1994,20 @@ public class ConversationFragment extends XmppFragment
         binding.walkieTalkieDismiss.setOnClickListener(v -> dismissWalkieTalkieOverlay());
         binding.walkieTalkieKeyboardToggle.setOnClickListener(v -> {
             walkieTalkieKeepKeyboard = !walkieTalkieKeepKeyboard;
-            binding.walkieTalkieKeyboardToggle.setAlpha(walkieTalkieKeepKeyboard ? 1.0f : 0.4f);
+            binding.walkieTalkieKeyboardToggle.setAlpha(walkieTalkieKeepKeyboard ? 1.0f : 0.5f);
+            final android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (walkieTalkieKeepKeyboard) {
+                binding.textinput.requestFocus();
+                if (imm != null) {
+                    imm.showSoftInput(binding.textinput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                }
+            } else {
+                binding.textinput.clearFocus();
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(binding.textinput.getWindowToken(), 0);
+                }
+            }
         });
         binding.timer.setOnClickListener(this.mTimerClickListener);
         binding.takePictureButton.setOnClickListener(this.mtakePictureButtonListener);
@@ -3213,6 +3226,7 @@ public class ConversationFragment extends XmppFragment
         binding.takePictureButton.setVisibility(walkieTalkie ? View.GONE : View.VISIBLE);
         binding.threadIdenticonLayout.setVisibility(walkieTalkie ? View.GONE : View.VISIBLE);
         binding.walkieTalkieToggleButton.setVisibility(walkieTalkie ? View.VISIBLE : View.GONE);
+        binding.walkieTalkieKeyboardToggle.setVisibility(walkieTalkie ? View.VISIBLE : View.GONE);
         if (walkieTalkie) {
             binding.emojisStickerLayout.setVisibility(View.GONE);
             android.view.ViewGroup.LayoutParams emojiParams = binding.emojisStickerLayout.getLayoutParams();

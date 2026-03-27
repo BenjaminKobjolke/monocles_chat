@@ -263,7 +263,8 @@
                         style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
                         android:layout_width="160dp"
                         android:layout_height="160dp"
-                        android:layout_gravity="center"
+                        android:layout_gravity="center_horizontal|bottom"
+                        android:layout_marginBottom="120dp"
                         android:padding="0dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
@@ -287,16 +288,6 @@
                         android:background="?selectableItemBackgroundBorderless"
                         android:contentDescription="@string/cancel" />
 
-                    <ImageButton
-                        android:id="@+id/walkie_talkie_keyboard_toggle"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:layout_gravity="top|start"
-                        android:layout_margin="16dp"
-                        android:src="@drawable/rounded_keyboard_24"
-                        android:background="?selectableItemBackgroundBorderless"
-                        android:alpha="0.4"
-                        android:contentDescription="@string/walkie_talkie_keep_keyboard" />
 
                     <TextView
                         android:id="@+id/walkie_talkie_timer"
@@ -666,13 +657,28 @@
                                 android:layout_width="36dp"
                                 android:layout_height="36dp"
                                 android:layout_marginEnd="3dp"
-                                android:layout_toStartOf="@+id/walkieTalkieToggleButton"
-                                android:layout_toLeftOf="@+id/walkieTalkieToggleButton"
+                                android:layout_toStartOf="@+id/walkieTalkieKeyboardToggle"
+                                android:layout_toLeftOf="@+id/walkieTalkieKeyboardToggle"
                                 android:layout_alignBottom="@+id/textinput_layout_new"
                                 android:background="?attr/selectableItemBackgroundBorderless"
                                 android:contentDescription="@string/attach_record_voice"
                                 android:src="@drawable/ic_mic_24dp"
                                 android:visibility="visible" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/walkieTalkieKeyboardToggle"
+                                style="?attr/materialIconButtonFilledTonalStyle"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:layout_marginEnd="3dp"
+                                android:layout_toStartOf="@+id/walkieTalkieToggleButton"
+                                android:layout_toLeftOf="@+id/walkieTalkieToggleButton"
+                                android:layout_alignBottom="@+id/textinput_layout_new"
+                                android:contentDescription="@string/walkie_talkie_keep_keyboard"
+                                app:icon="@drawable/rounded_keyboard_24"
+                                app:iconSize="24dp"
+                                android:alpha="0.5"
+                                android:visibility="gone" />
 
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/walkieTalkieToggleButton"
