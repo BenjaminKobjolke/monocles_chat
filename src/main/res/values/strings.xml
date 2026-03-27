@@ -277,6 +277,10 @@
     <string name="server_info_session_established">Session established</string>
     <string name="skip">Skip</string>
     <string name="disable_notifications">Disable notifications</string>
+    <string name="enable_walkie_talkie">Enable walkie-talkie</string>
+    <string name="disable_walkie_talkie">Disable walkie-talkie</string>
+    <string name="walkie_talkie_show_overlay">Show walkie-talkie</string>
+    <string name="walkie_talkie_keep_keyboard">Keep keyboard visible</string>
     <string name="enable">Enable</string>
     <string name="conference_requires_password">Group chat requires password</string>
     <string name="enter_password">Enter password</string>

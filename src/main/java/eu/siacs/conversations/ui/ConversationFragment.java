@@ -258,6 +258,8 @@ public class ConversationFragment extends XmppFragment
     private Integer oldOrientation;
     private int mStartTime = 0;
     private boolean recording = false;
+    private boolean walkieTalkieRecording = false;
+    private boolean walkieTalkieKeepKeyboard = false;
 
     private CountDownLatch outputFileWrittenLatch = new CountDownLatch(1);
 
@@ -325,6 +327,7 @@ public class ConversationFragment extends XmppFragment
     protected CommandAdapter commandAdapter;
     private MediaPreviewAdapter mediaPreviewAdapter;
     private String lastMessageUuid = null;
+    private String lastAutoPlayedMessageUuid = null;
     private Conversation conversation;
     private FragmentConversationBinding binding;
     private Toast messageLoaderToast;
@@ -1846,6 +1849,7 @@ public class ConversationFragment extends XmppFragment
         final MenuItem menuOngoingCall = menu.findItem(R.id.action_ongoing_call);
         final MenuItem menuVideoCall = menu.findItem(R.id.action_video_call);
         final MenuItem menuTogglePinned = menu.findItem(R.id.action_toggle_pinned);
+        final MenuItem menuToggleWalkieTalkie = menu.findItem(R.id.action_toggle_walkie_talkie);
         final MenuItem deleteCustomBg = menu.findItem(R.id.action_delete_custom_bg);
 
         if (conversation != null) {
@@ -1896,6 +1900,11 @@ public class ConversationFragment extends XmppFragment
                 menuTogglePinned.setTitle(R.string.remove_from_favorites);
             } else {
                 menuTogglePinned.setTitle(R.string.add_to_favorites);
+            }
+            if (conversation.isWalkieTalkieMode()) {
+                menuToggleWalkieTalkie.setTitle(R.string.disable_walkie_talkie);
+            } else {
+                menuToggleWalkieTalkie.setTitle(R.string.enable_walkie_talkie);
             }
             deleteCustomBg.setVisible(ChatBackgroundHelper.getBgFile(activity, conversation.getUuid()).exists());
         }
@@ -1980,6 +1989,13 @@ public class ConversationFragment extends XmppFragment
         binding.gifsButton.setOnClickListener(this.mgifsButtonListener);
         binding.keyboardButton.setOnClickListener(this.mkeyboardButtonListener);
         binding.recordVoiceButton.setOnClickListener(this.mRecordVoiceButtonListener);
+        binding.walkieTalkieToggleButton.setOnClickListener(v -> toggleWalkieTalkieOverlay());
+        binding.walkieTalkieRecordButton.setOnClickListener(v -> onWalkieTalkieRecordButtonClick());
+        binding.walkieTalkieDismiss.setOnClickListener(v -> dismissWalkieTalkieOverlay());
+        binding.walkieTalkieKeyboardToggle.setOnClickListener(v -> {
+            walkieTalkieKeepKeyboard = !walkieTalkieKeepKeyboard;
+            binding.walkieTalkieKeyboardToggle.setAlpha(walkieTalkieKeepKeyboard ? 1.0f : 0.4f);
+        });
         binding.timer.setOnClickListener(this.mTimerClickListener);
         binding.takePictureButton.setOnClickListener(this.mtakePictureButtonListener);
         binding.scrollToBottomButton.setOnClickListener(this.mScrollButtonListener);
@@ -3008,6 +3024,9 @@ public class ConversationFragment extends XmppFragment
             case R.id.action_toggle_pinned:
                 togglePinned();
                 break;
+            case R.id.action_toggle_walkie_talkie:
+                toggleWalkieTalkie();
+                break;
             case R.id.action_add_shortcut:
                 addShortcut();
                 break;
@@ -3173,6 +3192,139 @@ public class ConversationFragment extends XmppFragment
         conversation.setAttribute(Conversation.ATTRIBUTE_PINNED_ON_TOP, !pinned);
         activity.xmppConnectionService.updateConversation(conversation);
         activity.invalidateOptionsMenu();
+    }
+
+    private void toggleWalkieTalkie() {
+        final boolean current = conversation.isWalkieTalkieMode();
+        conversation.setAttribute(Conversation.ATTRIBUTE_WALKIE_TALKIE, !current);
+        activity.xmppConnectionService.updateConversation(conversation);
+        activity.invalidateOptionsMenu();
+        if (current) {
+            // Disabling WT mode — clear auto-play callback
+            messageListAdapter.getAudioPlayer().setOnAutoPlayCompleteCallback(null);
+        }
+        updateWalkieTalkieUI();
+    }
+
+    private void updateWalkieTalkieUI() {
+        if (conversation == null || binding == null) return;
+        final boolean walkieTalkie = conversation.isWalkieTalkieMode();
+        binding.emojiButton.setVisibility(walkieTalkie ? View.GONE : View.VISIBLE);
+        binding.takePictureButton.setVisibility(walkieTalkie ? View.GONE : View.VISIBLE);
+        binding.threadIdenticonLayout.setVisibility(walkieTalkie ? View.GONE : View.VISIBLE);
+        binding.walkieTalkieToggleButton.setVisibility(walkieTalkie ? View.VISIBLE : View.GONE);
+        if (walkieTalkie) {
+            binding.emojisStickerLayout.setVisibility(View.GONE);
+            android.view.ViewGroup.LayoutParams emojiParams = binding.emojisStickerLayout.getLayoutParams();
+            emojiParams.height = 0;
+            binding.emojisStickerLayout.setLayoutParams(emojiParams);
+        }
+        // Adjust text input positioning when emoji/camera buttons are hidden
+        final android.widget.RelativeLayout.LayoutParams params =
+                (android.widget.RelativeLayout.LayoutParams) binding.textinputLayoutNew.getLayoutParams();
+        if (walkieTalkie) {
+            params.removeRule(android.widget.RelativeLayout.END_OF);
+            params.removeRule(android.widget.RelativeLayout.RIGHT_OF);
+            params.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+            params.addRule(android.widget.RelativeLayout.ALIGN_PARENT_LEFT);
+            params.removeRule(android.widget.RelativeLayout.START_OF);
+            params.removeRule(android.widget.RelativeLayout.LEFT_OF);
+            params.addRule(android.widget.RelativeLayout.START_OF, R.id.recordVoiceButton);
+            params.addRule(android.widget.RelativeLayout.LEFT_OF, R.id.recordVoiceButton);
+        } else {
+            params.removeRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+            params.removeRule(android.widget.RelativeLayout.ALIGN_PARENT_LEFT);
+            params.addRule(android.widget.RelativeLayout.END_OF, R.id.emojiButton);
+            params.addRule(android.widget.RelativeLayout.RIGHT_OF, R.id.emojiButton);
+            params.removeRule(android.widget.RelativeLayout.START_OF);
+            params.removeRule(android.widget.RelativeLayout.LEFT_OF);
+            params.addRule(android.widget.RelativeLayout.START_OF, R.id.takePictureButton);
+            params.addRule(android.widget.RelativeLayout.LEFT_OF, R.id.takePictureButton);
+        }
+        binding.textinputLayoutNew.setLayoutParams(params);
+        if (!walkieTalkie && binding.walkieTalkieOverlay.getVisibility() == View.VISIBLE) {
+            binding.walkieTalkieOverlay.setVisibility(View.GONE);
+        }
+    }
+
+    private void toggleWalkieTalkieOverlay() {
+        if (binding.walkieTalkieOverlay.getVisibility() == View.VISIBLE) {
+            binding.walkieTalkieOverlay.setVisibility(View.GONE);
+        } else {
+            binding.walkieTalkieOverlay.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void onWalkieTalkieRecordButtonClick() {
+        if (!walkieTalkieRecording) {
+            attachFile(ATTACHMENT_CHOICE_RECORD_VOICE);
+            walkieTalkieRecording = true;
+            binding.walkieTalkieRecordButton.setIconResource(R.drawable.ic_stop_24dp);
+            binding.walkieTalkieTimer.setVisibility(View.VISIBLE);
+            // Hide the standard recording UI since we use the overlay timer
+            binding.recordingVoiceActivity.setVisibility(View.GONE);
+        } else {
+            mHandler.removeCallbacks(mTickExecutor);
+            stopRecording(true);
+            walkieTalkieRecording = false;
+            binding.walkieTalkieRecordButton.setIconResource(R.drawable.ic_mic_48dp);
+            binding.walkieTalkieTimer.setVisibility(View.GONE);
+            binding.walkieTalkieTimer.setText("");
+            binding.recordingVoiceActivity.setVisibility(View.GONE);
+            // Hide keyboard after sending (unless keep-keyboard toggle is on)
+            if (!walkieTalkieKeepKeyboard) {
+                binding.textinput.clearFocus();
+                final android.view.inputmethod.InputMethodManager imm =
+                        (android.view.inputmethod.InputMethodManager) activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(binding.textinput.getWindowToken(), 0);
+                }
+            }
+        }
+    }
+
+    private void autoPlayLatestVoiceMessage() {
+        if (messageList.isEmpty()) return;
+        // Find lastAutoPlayedMessageUuid in the list, then play the next unplayed voice message after it
+        for (int i = messageList.size() - 1; i >= 0; i--) {
+            final Message msg = messageList.get(i);
+            if (msg.getUuid().equals(lastAutoPlayedMessageUuid)) {
+                if (i + 1 < messageList.size()) {
+                    playNextUnplayedVoiceMessage(i + 1);
+                }
+                return;
+            }
+        }
+        // lastAutoPlayedMessageUuid not found in list — nothing to auto-play
+    }
+
+    private void playNextUnplayedVoiceMessage(int startIndex) {
+        for (int i = startIndex; i < messageList.size(); i++) {
+            final Message msg = messageList.get(i);
+            if (msg.getStatus() != Message.STATUS_RECEIVED) continue;
+            if (msg.getFileParams() == null || msg.getFileParams().runtime <= 0) continue;
+            if (msg.getTransferable() != null) continue;
+            final java.io.File file = activity.xmppConnectionService.getFileBackend().getFile(msg);
+            if (file.exists()) {
+                lastAutoPlayedMessageUuid = msg.getUuid();
+                final eu.siacs.conversations.ui.service.AudioPlayer audioPlayer = messageListAdapter.getAudioPlayer();
+                audioPlayer.setOnAutoPlayCompleteCallback(() -> autoPlayLatestVoiceMessage());
+                audioPlayer.autoPlay(msg);
+                return;
+            }
+        }
+    }
+
+    private void dismissWalkieTalkieOverlay() {
+        if (walkieTalkieRecording) {
+            mHandler.removeCallbacks(mTickExecutor);
+            stopRecording(false);
+            walkieTalkieRecording = false;
+            binding.walkieTalkieRecordButton.setIconResource(R.drawable.ic_mic_48dp);
+            binding.walkieTalkieTimer.setVisibility(View.GONE);
+            binding.walkieTalkieTimer.setText("");
+        }
+        binding.walkieTalkieOverlay.setVisibility(View.GONE);
     }
 
     private void checkPermissionAndTriggerAudioCall() {
@@ -4224,6 +4376,9 @@ public class ConversationFragment extends XmppFragment
         }
         final Conversation originalConversation = this.conversation;
         this.conversation = conversation;
+        // Set to the last message UUID so we only auto-play truly new messages
+        final Message lastMsg = conversation.getLatestMessage();
+        this.lastAutoPlayedMessageUuid = lastMsg != null ? lastMsg.getUuid() : null;
         // once we set the conversation all is good and it will automatically do the right thing in
         // onStart()
         if (this.activity == null || this.binding == null) {
@@ -4829,6 +4984,9 @@ public class ConversationFragment extends XmppFragment
                     }
                     this.messageListAdapter.notifyDataSetChanged();
                 }
+                if (conversation.isWalkieTalkieMode()) {
+                    autoPlayLatestVoiceMessage();
+                }
                 if (conversation.getReceivedMessagesCountSinceUuid(lastMessageUuid) != 0) {
                     binding.unreadCountCustomView.setVisibility(View.VISIBLE);
                     binding.unreadCountCustomView.setUnreadCount(
@@ -4841,6 +4999,7 @@ public class ConversationFragment extends XmppFragment
                 }
                 updateSendButton();
                 updateEditablity();
+                updateWalkieTalkieUI();
                 conversation.refreshSessions();
 
                 if (activity != null && (binding.tabLayout.getVisibility() == View.GONE || binding.conversationViewPager.getCurrentItem() == 0)) {
@@ -5032,14 +5191,17 @@ public class ConversationFragment extends XmppFragment
         // TODO send button color
         final Activity activity = getActivity();
         if (activity != null) {
+            final boolean canSend = text.length() > 0 || hasAttachments || (c.getThread() != null && binding.textinputSubject.getText().length() > 0)
+                    || c.isWalkieTalkieMode();
             this.binding.textSendButton.setIconResource(
-                    SendButtonTool.getSendButtonImageResource(action, text.length() > 0 || hasAttachments || (c.getThread() != null && binding.textinputSubject.getText().length() > 0)));
+                    SendButtonTool.getSendButtonImageResource(action, canSend));
         }
         if (activity == null) return;
+        final boolean isWalkieTalkie = conversation != null && conversation.isWalkieTalkieMode();
         final SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(activity);
-        if (canWrite() && pref != null && pref.getBoolean("show_thread_feature", getResources().getBoolean(R.bool.show_thread_feature))) {
+        if (!isWalkieTalkie && canWrite() && pref != null && pref.getBoolean("show_thread_feature", getResources().getBoolean(R.bool.show_thread_feature))) {
             binding.threadIdenticonLayout.setVisibility(VISIBLE);
-        } else {
+        } else if (!isWalkieTalkie) {
             binding.threadIdenticonLayout.setVisibility(GONE);
         }
         boolean canWrite = canWrite();
@@ -5048,7 +5210,9 @@ public class ConversationFragment extends XmppFragment
             binding.takePictureButton.setVisibility(GONE);
         } else {
             binding.recordVoiceButton.setVisibility(VISIBLE);
-            binding.takePictureButton.setVisibility(VISIBLE);
+            if (!isWalkieTalkie) {
+                binding.takePictureButton.setVisibility(VISIBLE);
+            }
         }
     }
 
@@ -5788,6 +5952,10 @@ public class ConversationFragment extends XmppFragment
 
 // Voice recorder
     public void recordVoice() {
+        // Stop any currently playing audio before recording
+        if (conversation != null && conversation.isWalkieTalkieMode()) {
+            messageListAdapter.stopAudioPlayer();
+        }
         this.binding.recordingVoiceActivity.setVisibility(View.VISIBLE);
         this.binding.recordVoiceButton.setEnabled(false);
         if (!startRecording()) {
@@ -5954,9 +6122,12 @@ public class ConversationFragment extends XmppFragment
                         () -> {
                             activity.setResult(
                                     Activity.RESULT_OK, new Intent().setData(Uri.fromFile(outputFile)));
-                            mediaPreviewAdapter.addMediaPreviews(Attachment.of(activity, Uri.fromFile(outputFile), Attachment.Type.RECORDING));
-                            toggleInputMethod();
-                            //attachFileToConversation(conversation, Uri.fromFile(outputFile), "audio/oga;codecs=opus");
+                            if (conversation.isWalkieTalkieMode()) {
+                                attachFileToConversation(conversation, Uri.fromFile(outputFile), "audio/oga;codecs=opus", null);
+                            } else {
+                                mediaPreviewAdapter.addMediaPreviews(Attachment.of(activity, Uri.fromFile(outputFile), Attachment.Type.RECORDING));
+                                toggleInputMethod();
+                            }
                             binding.recordingVoiceActivity.setVisibility(View.GONE);
                         });
             } else if ("aac".equals(userChosenCodec) || !Config.USE_OPUS_VOICE_MESSAGES) {
@@ -5975,9 +6146,12 @@ public class ConversationFragment extends XmppFragment
                         () -> {
                             activity.setResult(
                                     Activity.RESULT_OK, new Intent().setData(Uri.fromFile(outputFile)));
-                            mediaPreviewAdapter.addMediaPreviews(Attachment.of(activity, Uri.fromFile(outputFile), Attachment.Type.RECORDING));
-                            toggleInputMethod();
-                            //attachFileToConversation(conversation, Uri.fromFile(outputFile), "audio/mp4");
+                            if (conversation.isWalkieTalkieMode()) {
+                                attachFileToConversation(conversation, Uri.fromFile(outputFile), "audio/mp4", null);
+                            } else {
+                                mediaPreviewAdapter.addMediaPreviews(Attachment.of(activity, Uri.fromFile(outputFile), Attachment.Type.RECORDING));
+                                toggleInputMethod();
+                            }
                             binding.recordingVoiceActivity.setVisibility(View.GONE);
                         });
             }
@@ -6048,6 +6222,9 @@ public class ConversationFragment extends XmppFragment
 
         // Set the text view text.
         this.binding.timer.setText(time);
+        if (binding.walkieTalkieTimer.getVisibility() == View.VISIBLE) {
+            binding.walkieTalkieTimer.setText(time);
+        }
 
         // If running is true, increment the
         // seconds variable.
@@ -6071,12 +6248,12 @@ public class ConversationFragment extends XmppFragment
                 }
                 if (keyboardHeight > 100 && !(secondaryFragment instanceof ConversationFragment)) {
                     binding.keyboardButton.setVisibility(View.GONE);
-                    binding.emojiButton.setVisibility(View.VISIBLE);
+                    if (conversation == null || !conversation.isWalkieTalkieMode()) binding.emojiButton.setVisibility(View.VISIBLE);
                     params.height = keyboardHeight;
                     emojipickerview.setLayoutParams(params);
                 } else if (keyboardHeight > 100) {
                     binding.keyboardButton.setVisibility(View.GONE);
-                    binding.emojiButton.setVisibility(View.VISIBLE);
+                    if (conversation == null || !conversation.isWalkieTalkieMode()) binding.emojiButton.setVisibility(View.VISIBLE);
                     params.height = keyboardHeight - 127;
                     emojipickerview.setLayoutParams(params);
                 } else if (binding.emojiButton.getVisibility() == View.VISIBLE) {
@@ -6108,12 +6285,12 @@ public class ConversationFragment extends XmppFragment
                 Log.i("keyboard listener", "keyboardHeight: " + keyboardHeight + " keyboardOpen: " + keyboardOpen + " isLandscape: " + isLandscape);
                 if (keyboardOpen && !(secondaryFragment instanceof ConversationFragment)) {
                     binding.keyboardButton.setVisibility(View.GONE);
-                    binding.emojiButton.setVisibility(View.VISIBLE);
+                    if (conversation == null || !conversation.isWalkieTalkieMode()) binding.emojiButton.setVisibility(View.VISIBLE);
                     params.height = keyboardHeight - 10;
                     emojipickerview.setLayoutParams(params);
                 } else if (keyboardOpen) {
                     binding.keyboardButton.setVisibility(View.GONE);
-                    binding.emojiButton.setVisibility(View.VISIBLE);
+                    if (conversation == null || !conversation.isWalkieTalkieMode()) binding.emojiButton.setVisibility(View.VISIBLE);
                     params.height = keyboardHeight - 135;
                     emojipickerview.setLayoutParams(params);
                 } else if (binding.emojiButton.getVisibility() == View.VISIBLE) {
@@ -6343,7 +6520,7 @@ public class ConversationFragment extends XmppFragment
         public void onClick(View v) {
             if (binding.keyboardButton.getVisibility() == VISIBLE) {
                 binding.keyboardButton.setVisibility(GONE);
-                binding.emojiButton.setVisibility(VISIBLE);
+                if (conversation == null || !conversation.isWalkieTalkieMode()) binding.emojiButton.setVisibility(VISIBLE);
                 InputMethodManager inputMethodManager = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (inputMethodManager != null) {
                     binding.textinput.requestFocus();
@@ -6362,7 +6539,7 @@ public class ConversationFragment extends XmppFragment
                 params.height = 0;
                 emojipickerview.setLayoutParams(params);
                 binding.keyboardButton.setVisibility(GONE);
-                binding.emojiButton.setVisibility(VISIBLE);
+                if (conversation == null || !conversation.isWalkieTalkieMode()) binding.emojiButton.setVisibility(VISIBLE);
             }
             this.setEnabled(false);
             refresh();

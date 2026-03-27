@@ -55,6 +55,7 @@ public class AudioPlayer
             new PendingItem<>();
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private Runnable onAutoPlayCompleteCallback = null;
 
     private final Handler handler = new Handler();
 
@@ -261,6 +262,44 @@ public class AudioPlayer
         }
     }
 
+    public void autoPlay(Message message) {
+        synchronized (LOCK) {
+            if (player != null) {
+                stopCurrent();
+            }
+            AudioPlayer.player = new MediaPlayer();
+            try {
+                AudioPlayer.currentlyPlayingMessage = message;
+                AudioPlayer.player.setAudioStreamType(AudioManager.STREAM_MUSIC);
+                AudioPlayer.player.setDataSource(
+                        messageAdapter.getFileBackend().getFile(message).getAbsolutePath());
+                AudioPlayer.player.setOnCompletionListener(this);
+                AudioPlayer.player.prepare();
+                AudioPlayer.player.start();
+                messageAdapter.flagScreenOn();
+                for (final java.lang.ref.WeakReference<RelativeLayout> ref : audioPlayerLayouts) {
+                    final RelativeLayout layout = ref.get();
+                    if (layout == null) continue;
+                    final Message tag = (Message) layout.getTag();
+                    if (tag != null && tag.getUuid().equals(message.getUuid())) {
+                        final ViewHolder vh = ViewHolder.get(layout);
+                        vh.playPause.setIconResource(R.drawable.rounded_pause_36);
+                        vh.progress.setEnabled(true);
+                        stopRefresher(true);
+                        break;
+                    }
+                }
+            } catch (final Exception e) {
+                Log.w(Config.LOGTAG, "autoPlay failed", e);
+                AudioPlayer.currentlyPlayingMessage = null;
+            }
+        }
+    }
+
+    public void setOnAutoPlayCompleteCallback(Runnable callback) {
+        this.onAutoPlayCompleteCallback = callback;
+    }
+
     private boolean startStop(ViewHolder viewHolder, Message message) {
         if (message == currentlyPlayingMessage && player != null) {
             return playPauseCurrent(viewHolder);
@@ -317,6 +356,9 @@ public class AudioPlayer
             releaseProximityWakeLock();
             resetPlayerUi();
             sensorManager.unregisterListener(this);
+        }
+        if (onAutoPlayCompleteCallback != null) {
+            handler.post(onAutoPlayCompleteCallback);
         }
     }
 

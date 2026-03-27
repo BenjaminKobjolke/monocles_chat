@@ -2479,6 +2479,10 @@ public class MessageAdapter extends ArrayAdapter<Message> implements DraggableLi
         return activity.xmppConnectionService.getFileBackend();
     }
 
+    public AudioPlayer getAudioPlayer() {
+        return audioPlayer;
+    }
+
     public void stopAudioPlayer() {
         audioPlayer.stop();
     }

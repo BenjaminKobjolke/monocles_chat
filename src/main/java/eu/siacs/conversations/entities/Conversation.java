@@ -209,6 +209,7 @@ public class Conversation extends AbstractEntity
     public static final String ATTRIBUTE_FORMERLY_PRIVATE_NON_ANONYMOUS =
             "formerly_private_non_anonymous";
     public static final String ATTRIBUTE_PINNED_ON_TOP = "pinned_on_top";
+    public static final String ATTRIBUTE_WALKIE_TALKIE = "walkie_talkie";
     static final String ATTRIBUTE_MUC_PASSWORD = "muc_password";
     static final String ATTRIBUTE_MEMBERS_ONLY = "members_only";
     static final String ATTRIBUTE_MODERATED = "moderated";
@@ -1551,6 +1552,10 @@ public class Conversation extends AbstractEntity
 
     public boolean notifyReplies() {
         return alwaysNotify() || getBooleanAttribute(ATTRIBUTE_NOTIFY_REPLIES, false);
+    }
+
+    public boolean isWalkieTalkieMode() {
+        return getBooleanAttribute(ATTRIBUTE_WALKIE_TALKIE, false);
     }
 
     public void setStoreInCache(final boolean cache) {
