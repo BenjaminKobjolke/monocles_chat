@@ -272,6 +272,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix ".xida"
+            resValue "string", "app_name", "monocles chat xida"
+            buildConfigField "String", "APP_NAME", "\"monocles chat xida\""
+        }
         release {
             shrinkResources true
             minifyEnabled true
