@@ -301,6 +301,19 @@ android {
         buildTypes.release.signingConfig = signingConfigs.release
     }
 
+    if (new File("push.properties").exists()) {
+        Properties pushProps = new Properties()
+        pushProps.load(new FileInputStream(file("push.properties")))
+
+        productFlavors.playstore {
+            resValue "string", "app_server", pushProps['app_server']
+            resValue "string", "gcm_defaultSenderId", pushProps['gcm_defaultSenderId']
+            resValue "string", "google_app_id", pushProps['google_app_id']
+            resValue "string", "project_id", pushProps['project_id']
+            resValue "string", "google_api_key", pushProps['google_api_key']
+        }
+    }
+
     lintOptions {
         disable 'MissingTranslation', 'InvalidPackage','AppCompatResource'
         abortOnError false

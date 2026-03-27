@@ -1,0 +1,5 @@
+app_server=your.push.server.com
+gcm_defaultSenderId=000000000000
+google_app_id=1:000000000000:android:0000000000000000000000
+project_id=your-project-id
+google_api_key=your-google-api-key
